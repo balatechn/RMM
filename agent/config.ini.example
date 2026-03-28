@@ -1,0 +1,9 @@
+[server]
+# Backend API URL (include https:// for production)
+url = https://your-rmm-backend-domain.com
+# API key from device registration (get this from the admin dashboard)
+api_key = rmm_YOUR_API_KEY_HERE
+
+[agent]
+# Metrics collection interval in seconds (10-60)
+interval = 15
