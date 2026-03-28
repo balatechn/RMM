@@ -17,7 +17,7 @@ export function useDeviceSocket(deviceId) {
     const socket = io(WS_URL, {
       auth: { token },
       transports: ["websocket", "polling"],
-      reconnectionAttempts: 0,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 2000,
     });
 
