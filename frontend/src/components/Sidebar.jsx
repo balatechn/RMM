@@ -63,7 +63,7 @@ export default function Sidebar({ user }) {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
             const a = document.createElement("a");
             a.href = `${apiUrl}/api/agent/download?token=${encodeURIComponent(token)}`;
-            a.download = "rmm-agent.zip";
+            a.download = "rmm-agent.exe";
             a.click();
           }}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors"

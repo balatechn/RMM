@@ -7,6 +7,7 @@ const { authenticateToken } = require("../middleware/auth");
 const router = express.Router();
 
 const AGENT_DIR = path.join(__dirname, "../../agent");
+const EXE_PATH = path.join(AGENT_DIR, "dist", "rmm-agent.exe");
 
 // Middleware: accept token from query string for direct downloads
 function authFromQuery(req, res, next) {
@@ -16,8 +17,20 @@ function authFromQuery(req, res, next) {
   next();
 }
 
-// GET /api/agent/download — download agent as ZIP
+// GET /api/agent/download — download agent EXE
 router.get("/download", authFromQuery, authenticateToken, (req, res) => {
+  if (!fs.existsSync(EXE_PATH)) {
+    return res.status(404).json({ error: "Agent EXE not found" });
+  }
+
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.setHeader("Content-Disposition", "attachment; filename=rmm-agent.exe");
+  res.setHeader("Content-Length", fs.statSync(EXE_PATH).size);
+  fs.createReadStream(EXE_PATH).pipe(res);
+});
+
+// GET /api/agent/download/zip — download agent as ZIP
+router.get("/download/zip", authFromQuery, authenticateToken, (req, res) => {
   if (!fs.existsSync(AGENT_DIR)) {
     return res.status(404).json({ error: "Agent files not found" });
   }
