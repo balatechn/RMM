@@ -8,6 +8,7 @@ import MetricsChart from "@/components/MetricsChart";
 import StatusBadge from "@/components/StatusBadge";
 import TaskManager from "@/components/TaskManager";
 import DeviceManager from "@/components/DeviceManager";
+import FileManager from "@/components/FileManager";
 import { api } from "@/lib/api";
 import { useDeviceSocket } from "@/hooks/useDeviceSocket";
 import {
@@ -21,6 +22,7 @@ import {
   ListTodo,
   Settings,
   BarChart3,
+  FolderOpen,
 } from "lucide-react";
 
 const RemoteTerminal = dynamic(() => import("@/components/RemoteTerminal"), { ssr: false });
@@ -30,6 +32,7 @@ const TABS = [
   { id: "terminal", label: "Terminal", icon: TerminalSquare },
   { id: "tasks", label: "Task Manager", icon: ListTodo },
   { id: "device", label: "Device Manager", icon: Settings },
+  { id: "files", label: "File Manager", icon: FolderOpen },
 ];
 
 export default function DeviceDetailPage() {
@@ -226,6 +229,10 @@ export default function DeviceDetailPage() {
 
           {activeTab === "device" && (
             <DeviceManager deviceId={deviceId} emit={emit} on={on} agentConnected={agentConnected} />
+          )}
+
+          {activeTab === "files" && (
+            <FileManager deviceId={deviceId} emit={emit} on={on} agentConnected={agentConnected} />
           )}
         </div>
       </main>

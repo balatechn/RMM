@@ -44,6 +44,7 @@ export function useDeviceSocket(deviceId) {
     const events = [
       "metric", "device:status", "cmd:output", "cmd:done", "cmd:error",
       "processes:result", "sysinfo:result", "services:result", "software:result",
+      "users:result", "user:action:result", "files:result",
     ];
     events.forEach((event) => {
       socket.on(event, (data) => {

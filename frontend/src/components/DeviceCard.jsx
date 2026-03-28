@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import StatusBadge from "./StatusBadge";
-import { Cpu, MemoryStick, HardDrive, Clock } from "lucide-react";
+import { Cpu, MemoryStick, HardDrive, Clock, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
-export default function DeviceCard({ device }) {
+export default function DeviceCard({ device, onDelete }) {
   const [latest, setLatest] = useState(null);
 
   useEffect(() => {
@@ -29,7 +29,18 @@ export default function DeviceCard({ device }) {
               {device.hostname || device.ip_address || "—"}
             </p>
           </div>
-          <StatusBadge status={device.status} />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={device.status} />
+            {onDelete && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(device); }}
+                className="p-1 text-slate-600 hover:text-red-400 hover:bg-slate-800 rounded transition opacity-0 group-hover:opacity-100"
+                title="Remove device"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {latest ? (

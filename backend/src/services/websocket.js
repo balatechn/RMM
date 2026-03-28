@@ -91,6 +91,18 @@ function initWebSocket(server) {
           io.to(`device:${device.id}`).emit("software:result", { deviceId: device.id, ...data });
         });
 
+        socket.on("users:result", (data) => {
+          io.to(`device:${device.id}`).emit("users:result", { deviceId: device.id, ...data });
+        });
+
+        socket.on("user:action:result", (data) => {
+          io.to(`device:${device.id}`).emit("user:action:result", { deviceId: device.id, ...data });
+        });
+
+        socket.on("files:result", (data) => {
+          io.to(`device:${device.id}`).emit("files:result", { deviceId: device.id, ...data });
+        });
+
         socket.on("disconnect", async () => {
           connectedAgents.delete(device.id);
           await query("UPDATE devices SET status = 'offline' WHERE id = $1", [device.id]).catch(() => {});
@@ -159,6 +171,22 @@ function initWebSocket(server) {
 
     socket.on("service:action", ({ deviceId, serviceName, action }) => {
       io.to(`agent:${deviceId}`).emit("service:action", { serviceName, action });
+    });
+
+    socket.on("users:get", ({ deviceId }) => {
+      io.to(`agent:${deviceId}`).emit("users:get");
+    });
+
+    socket.on("user:lock", ({ deviceId, username }) => {
+      io.to(`agent:${deviceId}`).emit("user:lock", { username });
+    });
+
+    socket.on("user:unlock", ({ deviceId, username }) => {
+      io.to(`agent:${deviceId}`).emit("user:unlock", { username });
+    });
+
+    socket.on("files:list", ({ deviceId, path }) => {
+      io.to(`agent:${deviceId}`).emit("files:list", { path: path || "" });
     });
 
     // Check if agent is connected

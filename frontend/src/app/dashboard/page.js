@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showAddDevice, setShowAddDevice] = useState(false);
   const [newDevice, setNewDevice] = useState({ name: "", hostname: "", location: "", department: "" });
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [user, setUser] = useState(null);
   const router = useRouter();
 
@@ -95,6 +96,17 @@ export default function DashboardPage() {
       fetchData();
     } catch (err) {
       alert("Failed to add device: " + err.message);
+    }
+  }
+
+  async function handleDeleteDevice() {
+    if (!deleteTarget) return;
+    try {
+      await api.delete(`/devices/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      fetchData();
+    } catch (err) {
+      alert("Failed to delete device: " + err.message);
     }
   }
 
@@ -175,7 +187,7 @@ export default function DashboardPage() {
           {/* Device Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {devices.map((device) => (
-              <DeviceCard key={device.id} device={device} />
+              <DeviceCard key={device.id} device={device} onDelete={user?.role === "admin" ? setDeleteTarget : undefined} />
             ))}
             {devices.length === 0 && (
               <div className="col-span-full text-center py-16 text-slate-500">
@@ -185,6 +197,20 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {deleteTarget && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-sm space-y-4">
+              <h2 className="text-lg font-semibold text-white">Remove Device</h2>
+              <p className="text-slate-400">Are you sure you want to remove <span className="text-white font-medium">{deleteTarget.name || deleteTarget.hostname}</span>? This action cannot be undone.</p>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-800 transition">Cancel</button>
+                <button onClick={handleDeleteDevice} className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Remove</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add Device Modal */}
         {showAddDevice && (

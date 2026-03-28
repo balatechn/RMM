@@ -603,6 +603,194 @@ def handle_get_software(sio):
     threading.Thread(target=run, daemon=True).start()
 
 
+def handle_get_users(sio):
+    """Get local Windows user accounts"""
+    def run():
+        users = []
+        try:
+            result = subprocess.run(
+                ["powershell", "-Command",
+                 "Get-LocalUser | Select-Object Name, Enabled, "
+                 "@{N='LastLogon';E={$_.LastLogon.ToString('yyyy-MM-dd HH:mm:ss')}}, "
+                 "@{N='PasswordLastSet';E={$_.PasswordLastSet.ToString('yyyy-MM-dd HH:mm:ss')}}, "
+                 "Description, SID, "
+                 "@{N='IsAdmin';E={(Get-LocalGroupMember -Group 'Administrators' -ErrorAction SilentlyContinue | Where-Object {$_.Name -like \"*\\$($_.Name)\"}).Count -gt 0}} "
+                 "| ConvertTo-Json -Compress"],
+                capture_output=True, text=True, timeout=30
+            )
+            raw = json.loads(result.stdout)
+            if isinstance(raw, dict):
+                raw = [raw]
+            for u in raw:
+                sid = str(u.get("SID", ""))
+                # Extract just the SID string if it's an object
+                if isinstance(sid, dict):
+                    sid = sid.get("Value", "")
+                users.append({
+                    "name": u.get("Name", ""),
+                    "enabled": bool(u.get("Enabled", False)),
+                    "lastLogon": u.get("LastLogon", "") or "",
+                    "passwordLastSet": u.get("PasswordLastSet", "") or "",
+                    "description": u.get("Description", "") or "",
+                    "isAdmin": bool(u.get("IsAdmin", False)),
+                    "sid": sid,
+                })
+        except Exception as e:
+            logger.error(f"Failed to get users: {e}")
+
+        sio.emit("users:result", {"users": users})
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def handle_user_lock(sio, data):
+    """Disable (lock) a local user account"""
+    username = data.get("username", "")
+    if not username:
+        return
+    def run():
+        try:
+            result = subprocess.run(
+                ["powershell", "-Command", f"Disable-LocalUser -Name '{username}'"],
+                capture_output=True, text=True, timeout=15
+            )
+            success = result.returncode == 0
+            logger.info(f"User '{username}' locked: {success}")
+            sio.emit("user:action:result", {"username": username, "action": "lock", "success": success, "error": result.stderr.strip() if not success else ""})
+        except Exception as e:
+            sio.emit("user:action:result", {"username": username, "action": "lock", "success": False, "error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def handle_user_unlock(sio, data):
+    """Enable (unlock) a local user account"""
+    username = data.get("username", "")
+    if not username:
+        return
+    def run():
+        try:
+            result = subprocess.run(
+                ["powershell", "-Command", f"Enable-LocalUser -Name '{username}'"],
+                capture_output=True, text=True, timeout=15
+            )
+            success = result.returncode == 0
+            logger.info(f"User '{username}' unlocked: {success}")
+            sio.emit("user:action:result", {"username": username, "action": "unlock", "success": success, "error": result.stderr.strip() if not success else ""})
+        except Exception as e:
+            sio.emit("user:action:result", {"username": username, "action": "unlock", "success": False, "error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+# ============================================================
+# FILE MANAGER HANDLERS
+# ============================================================
+
+def handle_files_list(sio, data):
+    """List drives or directory contents"""
+    path = data.get("path", "")
+
+    def run():
+        try:
+            items = []
+            if not path:
+                # List drives
+                if HAS_PSUTIL:
+                    for part in psutil.disk_partitions():
+                        try:
+                            usage = psutil.disk_usage(part.mountpoint)
+                            items.append({
+                                "name": part.device.rstrip("\\"),
+                                "path": part.device,
+                                "type": "drive",
+                                "size": usage.total,
+                                "modified": "",
+                                "fstype": part.fstype,
+                                "usedSpace": usage.used,
+                                "freeSpace": usage.free,
+                            })
+                        except Exception:
+                            items.append({
+                                "name": part.device.rstrip("\\"),
+                                "path": part.device,
+                                "type": "drive",
+                                "size": 0,
+                                "modified": "",
+                            })
+                else:
+                    for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                        drive = f"{letter}:\\"
+                        if os.path.exists(drive):
+                            try:
+                                total, used, free = 0, 0, 0
+                                result = subprocess.run(
+                                    ["powershell", "-Command",
+                                     f"$d = Get-PSDrive {letter} -ErrorAction SilentlyContinue; "
+                                     f"if($d){{ @{{total=($d.Used+$d.Free);used=$d.Used;free=$d.Free}} | ConvertTo-Json }}"],
+                                    capture_output=True, text=True, timeout=10
+                                )
+                                if result.stdout.strip():
+                                    d = json.loads(result.stdout)
+                                    total, used, free = int(d.get("total", 0)), int(d.get("used", 0)), int(d.get("free", 0))
+                                items.append({
+                                    "name": f"{letter}:",
+                                    "path": drive,
+                                    "type": "drive",
+                                    "size": total,
+                                    "modified": "",
+                                    "usedSpace": used,
+                                    "freeSpace": free,
+                                })
+                            except Exception:
+                                items.append({"name": f"{letter}:", "path": drive, "type": "drive", "size": 0, "modified": ""})
+
+                sio.emit("files:result", {"path": "", "items": items, "error": None})
+                return
+
+            # Normalize path
+            target = os.path.normpath(path)
+            if not os.path.exists(target):
+                sio.emit("files:result", {"path": path, "items": [], "error": "Path does not exist"})
+                return
+            if not os.path.isdir(target):
+                sio.emit("files:result", {"path": path, "items": [], "error": "Not a directory"})
+                return
+
+            for entry in os.scandir(target):
+                try:
+                    stat = entry.stat()
+                    items.append({
+                        "name": entry.name,
+                        "path": entry.path,
+                        "type": "folder" if entry.is_dir() else "file",
+                        "size": stat.st_size if entry.is_file() else 0,
+                        "modified": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat.st_mtime)),
+                    })
+                except PermissionError:
+                    items.append({
+                        "name": entry.name,
+                        "path": entry.path,
+                        "type": "folder" if entry.is_dir(follow_symlinks=False) else "file",
+                        "size": 0,
+                        "modified": "",
+                        "restricted": True,
+                    })
+                except Exception:
+                    pass
+
+            # Sort: folders first, then files, both alphabetical
+            items.sort(key=lambda x: (0 if x["type"] == "folder" else 1, x["name"].lower()))
+            sio.emit("files:result", {"path": target, "items": items, "error": None})
+
+        except PermissionError:
+            sio.emit("files:result", {"path": path, "items": [], "error": "Access denied"})
+        except Exception as e:
+            sio.emit("files:result", {"path": path, "items": [], "error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+
+
 # ============================================================
 # WINDOWS SERVICE (Scheduled Task) & WHITELIST
 # ============================================================
@@ -910,6 +1098,22 @@ def main():
         @sio.on("software:get")
         def on_software_get(*args):
             handle_get_software(sio)
+
+        @sio.on("users:get")
+        def on_users_get(*args):
+            handle_get_users(sio)
+
+        @sio.on("user:lock")
+        def on_user_lock(data):
+            handle_user_lock(sio, data)
+
+        @sio.on("user:unlock")
+        def on_user_unlock(data):
+            handle_user_unlock(sio, data)
+
+        @sio.on("files:list")
+        def on_files_list(data):
+            handle_files_list(sio, data)
 
         # Connect in background thread
         def connect_sio():
