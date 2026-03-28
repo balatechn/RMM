@@ -4,6 +4,7 @@ const http = require("http");
 const cors = require("cors");
 const helmet = require("helmet");
 const { initDb } = require("./config/database");
+const { seed } = require("./config/seed");
 const { initWebSocket } = require("./services/websocket");
 const { startAlertEngine } = require("./services/alertEngine");
 const logger = require("./utils/logger");
@@ -42,6 +43,7 @@ const PORT = process.env.PORT || 4000;
 (async () => {
   try {
     await initDb();
+    await seed();
     logger.info("Database initialized");
 
     initWebSocket(server);
