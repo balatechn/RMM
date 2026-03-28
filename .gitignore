@@ -17,3 +17,5 @@ __pycache__/
 !agent/**
 !agent/dist/
 !agent/dist/rmm-agent.exe
+frontend/node_modules/
+backend/node_modules/
