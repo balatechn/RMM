@@ -1,0 +1,55 @@
+ethod&quot;:&quot;GET&quot;,&quot;release&quot;:&quot;a-a-a&quot;,&quot;children&quot;:[],&quot;scripts&quot;:[],&quot;assets&quot;:[],&quot;errors&quot;:[],&quot;locale&quot;:&quot;en&quot;},&quot;checksum&quot;:&quot;992f4fe89097fb0bd4fc99304a686af4d32ba94061cb8006252db4fcf48d0485&quot;}" wire:effects="[]" wire:id="mVH4jR7nZeoZdq9BqVXX" class="w-full">
+    <form class="flex flex-col gap-2 w-full" wire:submit='addToken'>
+        <!--[if BLOCK]><![endif]-->            
+            <!--[if BLOCK]><![endif]-->                <input type="hidden" wire:model="provider" />
+            <!--[if ENDBLOCK]><![endif]-->
+            <div class="w-full">
+    <!--[if BLOCK]><![endif]-->        <label class="flex gap-1 items-center mb-1 text-sm font-medium">Token Name
+            <!--[if BLOCK]><![endif]-->                <span class="text-helper">*</span>
+            <!--[if ENDBLOCK]><![endif]-->            <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->        </label>
+    <!--[if ENDBLOCK]><![endif]-->    <!--[if BLOCK]><![endif]-->        <input autocomplete="off"             class="input" placeholder="e.g., Production Hetzner. tip: add Hetzner project name to identify easier" required              wire:model=name wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]"             wire:loading.attr="disabled"
+            type="text"  min=""
+            max="" minlength=""
+            maxlength=""
+             id=name-g111brf8vij5ft9o2wrs513n  name="name"
+            placeholder="e.g., Production Hetzner. tip: add Hetzner project name to identify easier"
+            >
+    <!--[if ENDBLOCK]><![endif]-->    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]--></div>
+
+            <div class="w-full">
+    <!--[if BLOCK]><![endif]-->        <label class="flex gap-1 items-center mb-1 text-sm font-medium">API Token
+            <!--[if BLOCK]><![endif]-->                <span class="text-helper">*</span>
+            <!--[if ENDBLOCK]><![endif]-->            <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->        </label>
+    <!--[if ENDBLOCK]><![endif]-->    <!--[if BLOCK]><![endif]-->        <div class="relative" x-data="{ type: 'password' }">
+            <!--[if BLOCK]><![endif]-->                <div x-on:click="changePasswordFieldType; type = type === 'password' ? 'text' : 'password'"
+                    class="flex absolute inset-y-0 right-0 items-center pr-2 cursor-pointer dark:hover:text-white">
+                    
+                    <svg x-show="type === 'password'" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                        <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
+                    </svg>
+                    
+                    <svg x-cloak x-show="type === 'text'" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M10.585 10.587a2 2 0 0 0 2.829 2.828" />
+                        <path d="M16.681 16.673a8.717 8.717 0 0 1 -4.681 1.327c-3.6 0 -6.6 -2 -9 -6c1.272 -2.12 2.712 -3.678 4.32 -4.674m2.86 -1.146a9.055 9.055 0 0 1 1.82 -.18c3.6 0 6.6 2 9 6c-.666 1.11 -1.379 2.067 -2.138 2.87" />
+                        <path d="M3 3l18 18" />
+                    </svg>
+                </div>
+            <!--[if ENDBLOCK]><![endif]-->            <input autocomplete="off" value=""
+                class="input  pr-[2.8rem]" placeholder="Enter your API token" required                 wire:model=token wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]"                 wire:loading.attr="disabled"
+                type="password"   id="token-p105xm9gltiou71lizlqhaxz"
+                name="token" placeholder="Enter your API token"
+                aria-placeholder="Enter your API token"
+                >
+
+        </div>
+    <!--[if ENDBLOCK]><![endif]-->    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]--></div>
+
+            <!--[if BLOCK]><![endif]-->                <div class="text-sm text-neutral-500 dark:text-neutral-400">
+                    Create an API token in the <a
+                        href='https://console.hetzner.com/projects'
+      
