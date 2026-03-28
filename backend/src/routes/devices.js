@@ -91,6 +91,34 @@ router.put("/:id", authenticateToken, requireRole("admin"), async (req, res) => 
   }
 });
 
+// POST /api/devices/auto-register — agent self-registration
+router.post("/auto-register", apiLimiter, async (req, res) => {
+  try {
+    const { hostname, os_info } = req.body;
+    if (!hostname) return res.status(400).json({ error: "hostname is required" });
+
+    // Check if device with this hostname already exists
+    const existing = await query("SELECT id, api_key FROM devices WHERE hostname = $1", [hostname]);
+    if (existing.rows.length > 0) {
+      return res.json({ device_id: existing.rows[0].id, api_key: existing.rows[0].api_key, message: "Device already registered" });
+    }
+
+    const apiKey = `rmm_${crypto.randomBytes(32).toString("hex")}`;
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress;
+
+    const result = await query(
+      `INSERT INTO devices (name, hostname, ip_address, os_info, api_key, status, last_seen)
+       VALUES ($1, $2, $3, $4, $5, 'online', NOW())
+       RETURNING id, api_key`,
+      [hostname, hostname, ip, os_info || "", apiKey]
+    );
+
+    res.status(201).json({ device_id: result.rows[0].id, api_key: result.rows[0].api_key, message: "Device registered" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to register device" });
+  }
+});
+
 // DELETE /api/devices/:id
 router.delete("/:id", authenticateToken, requireRole("admin"), async (req, res) => {
   try {

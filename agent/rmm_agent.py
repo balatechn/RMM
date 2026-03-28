@@ -23,8 +23,14 @@ except ImportError:
     HAS_PSUTIL = False
 
 # ---------- Configuration ----------
-CONFIG_FILE = Path(__file__).parent / "config.ini"
-LOG_FILE = Path(__file__).parent / "rmm_agent.log"
+# For PyInstaller --onefile, use exe directory; otherwise script directory
+if getattr(sys, 'frozen', False):
+    APP_DIR = Path(sys.executable).parent
+else:
+    APP_DIR = Path(__file__).parent
+
+CONFIG_FILE = APP_DIR / "config.ini"
+LOG_FILE = APP_DIR / "rmm_agent.log"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,11 +44,10 @@ logger = logging.getLogger("rmm-agent")
 
 
 def load_config():
-    """Load configuration from config.ini"""
+    """Load configuration from config.ini, or run setup wizard if missing"""
     if not CONFIG_FILE.exists():
-        logger.error(f"Config file not found: {CONFIG_FILE}")
-        logger.error("Copy config.ini.example to config.ini and fill in values")
-        sys.exit(1)
+        logger.info("No config.ini found — starting setup wizard...")
+        run_setup_wizard()
 
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE)
@@ -52,9 +57,82 @@ def load_config():
     for section, key in required:
         if not config.has_option(section, key) or not config.get(section, key):
             logger.error(f"Missing required config: [{section}] {key}")
-            sys.exit(1)
+            logger.info("Deleting invalid config and restarting setup...")
+            CONFIG_FILE.unlink(missing_ok=True)
+            run_setup_wizard()
+            config.read(CONFIG_FILE)
 
     return config
+
+
+def run_setup_wizard():
+    """Interactive setup: prompt for server URL, auto-register device, save config"""
+    print("\n" + "=" * 50)
+    print("  RMM Agent — First-Time Setup")
+    print("=" * 50)
+
+    # Get server URL
+    while True:
+        server_url = input("\nEnter RMM server URL (e.g. http://your-server:4000): ").strip().rstrip("/")
+        if not server_url:
+            print("  Server URL is required.")
+            continue
+        if not server_url.startswith("http"):
+            server_url = "http://" + server_url
+        # Test connectivity
+        print(f"  Testing connection to {server_url}...")
+        try:
+            req = Request(f"{server_url}/health", method="GET")
+            with urlopen(req, timeout=10) as resp:
+                if resp.status == 200:
+                    print("  Connected successfully!")
+                    break
+        except Exception as e:
+            print(f"  Cannot reach server: {e}")
+            print("  Please check the URL and try again.")
+
+    # Auto-register device
+    hostname = socket.gethostname()
+    os_info = f"{platform.system()} {platform.release()} ({platform.version()})"
+    print(f"\n  Registering device: {hostname}")
+
+    reg_data = json.dumps({"hostname": hostname, "os_info": os_info}).encode("utf-8")
+    req = Request(f"{server_url}/api/devices/auto-register", data=reg_data, method="POST")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            api_key = result["api_key"]
+            device_id = result["device_id"]
+            print(f"  Registered! Device ID: {device_id}")
+    except HTTPError as e:
+        body = e.read().decode("utf-8") if e.fp else ""
+        print(f"  Registration failed: {e.code} — {body}")
+        input("Press Enter to exit...")
+        sys.exit(1)
+    except Exception as e:
+        print(f"  Registration failed: {e}")
+        input("Press Enter to exit...")
+        sys.exit(1)
+
+    # Get interval
+    interval_input = input("\nMetrics interval in seconds (default 15): ").strip()
+    interval = 15
+    if interval_input.isdigit() and 5 <= int(interval_input) <= 300:
+        interval = int(interval_input)
+
+    # Save config.ini
+    config = configparser.ConfigParser()
+    config["server"] = {"url": server_url, "api_key": api_key}
+    config["agent"] = {"interval": str(interval)}
+
+    with open(CONFIG_FILE, "w") as f:
+        config.write(f)
+
+    print(f"\n  Config saved to: {CONFIG_FILE}")
+    print("  Setup complete! Starting agent...\n")
+    print("=" * 50)
 
 
 def get_cpu_usage():
