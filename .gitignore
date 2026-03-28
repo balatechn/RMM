@@ -8,3 +8,10 @@ postgres_data/
 __pycache__/
 *.pyc
 .venv/
+*.txt
+*.html
+*.py
+*.json
+!backend/**
+!frontend/**
+!agent/**
