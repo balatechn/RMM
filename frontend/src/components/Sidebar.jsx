@@ -9,11 +9,13 @@ import {
   Monitor,
   Shield,
   Download,
+  Users,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/alerts", icon: Bell, label: "Alerts" },
+  { href: "/users", icon: Users, label: "Users", adminOnly: true },
 ];
 
 export default function Sidebar({ user }) {
@@ -36,7 +38,9 @@ export default function Sidebar({ user }) {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map((item) => {
+        {navItems
+          .filter((item) => !item.adminOnly || user?.role === "admin")
+          .map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link

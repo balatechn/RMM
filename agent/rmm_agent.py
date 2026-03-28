@@ -2,6 +2,7 @@
 RMM Agent for Windows
 System monitoring + remote support agent.
 Connects via Socket.IO for real-time remote CMD, task manager, device manager.
+Runs as a background scheduled task with Windows Defender exclusion.
 """
 
 import os
@@ -15,6 +16,7 @@ import subprocess
 import threading
 import configparser
 import winreg
+import ctypes
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
@@ -137,8 +139,22 @@ def run_setup_wizard():
         config.write(f)
 
     print(f"\n  Config saved to: {CONFIG_FILE}")
-    print("  Setup complete! Starting agent...\n")
+    print("  Setup complete!\n")
     print("=" * 50)
+
+    # Offer to install as background service
+    if is_admin():
+        choice = input("\nInstall as background service? (Y/n): ").strip().lower()
+        if choice != "n":
+            add_defender_exclusion()
+            install_service()
+            print("\n  Agent installed and running in background!")
+            print("  You can close this window.")
+            input("\nPress Enter to exit...")
+            sys.exit(0)
+    else:
+        print("\n  TIP: Run as Administrator and use 'rmm-agent install'")
+        print("  to install as a background service with auto-start.")
 
 
 # ============================================================
@@ -588,6 +604,250 @@ def handle_get_software(sio):
 
 
 # ============================================================
+# WINDOWS SERVICE (Scheduled Task) & WHITELIST
+# ============================================================
+
+SERVICE_NAME = "RMMAgent"
+SERVICE_DESC = "RMM Remote Monitoring & Management Agent"
+
+
+def is_admin():
+    """Check if running with admin privileges"""
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except Exception:
+        return False
+
+
+def get_exe_path():
+    """Get the path to the running EXE"""
+    if getattr(sys, 'frozen', False):
+        return str(Path(sys.executable).resolve())
+    return str(Path(__file__).resolve())
+
+
+def add_defender_exclusion():
+    """Add Windows Defender exclusion for the agent EXE and its directory"""
+    exe = get_exe_path()
+    exe_dir = str(Path(exe).parent)
+    try:
+        subprocess.run(
+            ["powershell", "-Command",
+             f"Add-MpPreference -ExclusionPath '{exe}' -ErrorAction SilentlyContinue; "
+             f"Add-MpPreference -ExclusionPath '{exe_dir}' -ErrorAction SilentlyContinue; "
+             f"Add-MpPreference -ExclusionProcess '{Path(exe).name}' -ErrorAction SilentlyContinue"],
+            capture_output=True, timeout=30
+        )
+        logger.info(f"Windows Defender exclusion added for {exe}")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to add Defender exclusion: {e}")
+        return False
+
+
+def remove_defender_exclusion():
+    """Remove Windows Defender exclusion"""
+    exe = get_exe_path()
+    exe_dir = str(Path(exe).parent)
+    try:
+        subprocess.run(
+            ["powershell", "-Command",
+             f"Remove-MpPreference -ExclusionPath '{exe}' -ErrorAction SilentlyContinue; "
+             f"Remove-MpPreference -ExclusionPath '{exe_dir}' -ErrorAction SilentlyContinue; "
+             f"Remove-MpPreference -ExclusionProcess '{Path(exe).name}' -ErrorAction SilentlyContinue"],
+            capture_output=True, timeout=30
+        )
+        logger.info("Windows Defender exclusion removed")
+    except Exception:
+        pass
+
+
+def install_service():
+    """Install agent as a Windows Scheduled Task that runs at startup"""
+    if not is_admin():
+        print("  ERROR: Administrator privileges required.")
+        print("  Right-click the EXE and select 'Run as administrator'.")
+        return False
+
+    exe = get_exe_path()
+    print(f"\n  Installing RMM Agent service...")
+    print(f"  EXE: {exe}")
+
+    # Add Defender exclusion first
+    add_defender_exclusion()
+
+    # Remove existing task if present
+    subprocess.run(
+        ["schtasks", "/Delete", "/TN", SERVICE_NAME, "/F"],
+        capture_output=True, timeout=15
+    )
+
+    # Create scheduled task: runs at system startup, runs whether user is logged on or not
+    result = subprocess.run(
+        ["schtasks", "/Create",
+         "/TN", SERVICE_NAME,
+         "/TR", f'"{exe}" --run',
+         "/SC", "ONSTART",
+         "/RU", "SYSTEM",
+         "/RL", "HIGHEST",
+         "/F",
+         "/DELAY", "0000:30"],
+        capture_output=True, text=True, timeout=30
+    )
+
+    if result.returncode == 0:
+        print("  Scheduled task created successfully!")
+        print(f"  Task Name: {SERVICE_NAME}")
+        print("  Trigger: On system startup (as SYSTEM)")
+
+        # Also start it now
+        start_service()
+        return True
+    else:
+        print(f"  Failed to create scheduled task: {result.stderr.strip()}")
+        return False
+
+
+def uninstall_service():
+    """Remove the scheduled task and Defender exclusions"""
+    if not is_admin():
+        print("  ERROR: Administrator privileges required.")
+        return False
+
+    print(f"\n  Uninstalling RMM Agent service...")
+
+    # Stop the task first
+    stop_service()
+
+    # Delete the task
+    result = subprocess.run(
+        ["schtasks", "/Delete", "/TN", SERVICE_NAME, "/F"],
+        capture_output=True, text=True, timeout=15
+    )
+
+    if result.returncode == 0:
+        print("  Scheduled task removed.")
+    else:
+        print(f"  Note: {result.stderr.strip()}")
+
+    remove_defender_exclusion()
+    print("  Defender exclusions removed.")
+    print("  Uninstall complete.")
+    return True
+
+
+def start_service():
+    """Start the scheduled task"""
+    result = subprocess.run(
+        ["schtasks", "/Run", "/TN", SERVICE_NAME],
+        capture_output=True, text=True, timeout=15
+    )
+    if result.returncode == 0:
+        print("  Agent started in background.")
+    else:
+        print(f"  Failed to start: {result.stderr.strip()}")
+
+
+def stop_service():
+    """Stop the running agent"""
+    # Kill any running instances
+    exe_name = Path(get_exe_path()).name
+    subprocess.run(
+        ["taskkill", "/F", "/IM", exe_name],
+        capture_output=True, timeout=15
+    )
+    # End the scheduled task
+    subprocess.run(
+        ["schtasks", "/End", "/TN", SERVICE_NAME],
+        capture_output=True, timeout=15
+    )
+    print("  Agent stopped.")
+
+
+def service_status():
+    """Check if the agent task is running"""
+    result = subprocess.run(
+        ["schtasks", "/Query", "/TN", SERVICE_NAME, "/FO", "CSV", "/NH"],
+        capture_output=True, text=True, timeout=15
+    )
+    if result.returncode != 0:
+        print("  Status: NOT INSTALLED")
+        return
+
+    line = result.stdout.strip()
+    if "Running" in line:
+        print("  Status: RUNNING")
+    elif "Ready" in line:
+        print("  Status: INSTALLED (not running)")
+    else:
+        print(f"  Status: {line}")
+
+    # Check if process is actually running
+    exe_name = Path(get_exe_path()).name
+    check = subprocess.run(
+        ["tasklist", "/FI", f"IMAGENAME eq {exe_name}", "/NH"],
+        capture_output=True, text=True, timeout=10
+    )
+    if exe_name.lower() in check.stdout.lower():
+        print("  Process: ACTIVE")
+    else:
+        print("  Process: NOT RUNNING")
+
+
+def handle_cli():
+    """Handle command-line arguments for service management"""
+    if len(sys.argv) < 2:
+        return False
+
+    cmd = sys.argv[1].lower().lstrip("-")
+
+    if cmd == "install":
+        # Run setup wizard first if no config
+        if not CONFIG_FILE.exists():
+            run_setup_wizard()
+        install_service()
+        input("\nPress Enter to exit...")
+        sys.exit(0)
+
+    elif cmd == "uninstall":
+        uninstall_service()
+        input("\nPress Enter to exit...")
+        sys.exit(0)
+
+    elif cmd == "start":
+        start_service()
+        sys.exit(0)
+
+    elif cmd == "stop":
+        stop_service()
+        sys.exit(0)
+
+    elif cmd == "status":
+        service_status()
+        input("\nPress Enter to exit...")
+        sys.exit(0)
+
+    elif cmd == "run":
+        # Silent background run mode (called by scheduled task)
+        return True
+
+    elif cmd == "help":
+        print("\n  RMM Agent Commands:")
+        print("  -------------------")
+        print("  rmm-agent install    - Setup, whitelist & install as background service")
+        print("  rmm-agent uninstall  - Remove service & Defender exclusions")
+        print("  rmm-agent start      - Start the background service")
+        print("  rmm-agent stop       - Stop the running agent")
+        print("  rmm-agent status     - Check service status")
+        print("  rmm-agent run        - Run in foreground (used by service)")
+        print("  rmm-agent            - Interactive setup + run")
+        print()
+        sys.exit(0)
+
+    return False
+
+
+# ============================================================
 # MAIN
 # ============================================================
 
@@ -697,4 +957,7 @@ def main():
 
 
 if __name__ == "__main__":
+    # Handle CLI commands (install, uninstall, start, stop, status)
+    handle_cli()
+    # If no CLI command or --run mode, start the agent
     main()
