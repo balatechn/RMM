@@ -8,6 +8,7 @@ import {
   LogOut,
   Monitor,
   Shield,
+  Download,
 } from "lucide-react";
 
 const navItems = [
@@ -53,6 +54,24 @@ export default function Sidebar({ user }) {
           );
         })}
       </nav>
+
+      {/* Agent Download */}
+      <div className="px-3 pb-2">
+        <button
+          onClick={() => {
+            const token = localStorage.getItem("rmm_token");
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+            const a = document.createElement("a");
+            a.href = `${apiUrl}/api/agent/download?token=${encodeURIComponent(token)}`;
+            a.download = "rmm-agent.zip";
+            a.click();
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
+        >
+          <Download className="h-5 w-5" />
+          Download Agent
+        </button>
+      </div>
 
       {/* User Section */}
       <div className="px-4 py-4 border-t border-slate-800">

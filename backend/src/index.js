@@ -13,6 +13,7 @@ const authRoutes = require("./routes/auth");
 const deviceRoutes = require("./routes/devices");
 const metricRoutes = require("./routes/metrics");
 const alertRoutes = require("./routes/alerts");
+const agentRoutes = require("./routes/agent");
 
 const app = express();
 const server = http.createServer(app);
@@ -30,6 +31,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/devices", deviceRoutes);
 app.use("/api/metrics", metricRoutes);
 app.use("/api/alerts", alertRoutes);
+app.use("/api/agent", agentRoutes);
 
 // --- Global error handler ---
 app.use((err, _req, res, _next) => {
