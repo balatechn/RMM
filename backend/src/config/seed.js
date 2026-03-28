@@ -5,18 +5,18 @@ const logger = require("../utils/logger");
 async function seed() {
   try {
     // Check if admin already exists
-    const existing = await query("SELECT id FROM users WHERE username = $1", ["admin"]);
+    const existing = await query("SELECT id FROM users WHERE username = $1", ["bala"]);
     if (existing.rows.length > 0) {
       logger.info("Admin user already exists, skipping seed");
       return;
     }
 
-    const hash = await bcrypt.hash("admin123", 12);
+    const hash = await bcrypt.hash("Nzt@2026!!", 12);
     await query(
       "INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4)",
-      ["admin", "admin@rmm.local", hash, "admin"]
+      ["bala", "bala@rmm.local", hash, "admin"]
     );
-    logger.info("Default admin user created (username: admin, password: admin123) — CHANGE THIS IMMEDIATELY");
+    logger.info("Admin user created (username: bala)");
   } catch (err) {
     logger.error("Seed error", { error: err.message });
   }
